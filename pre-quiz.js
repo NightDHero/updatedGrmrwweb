@@ -150,7 +150,6 @@ document.addEventListener("DOMContentLoaded", () => {
         let questionContainers = [];
         let totalQuestionQuantity = cammelCasedQuizIDs.length * questionQuantity;
         let questionNumberElement = getOrCreateElement("question-number", "question-number", "p", header);
-        
 
         cammelCasedQuizIDs.forEach(quizID => {
             let quizContainer = getOrCreateElement(`${quizID}-container`, "quiz-container", "div", wholeQuestionContainer);
@@ -188,19 +187,115 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    function selectOption(selectedOption) {
-        const currentQuestionOptions = document.querySelectorAll(".question-option");
+    function selectOption() {
+        const questions = document.querySelectorAll(".question-container");
+        questions.forEach(question => {
+            const options = question.querySelectorAll(".question-option");
 
-        currentQuestionOptions.forEach(option => {
-            if (option.id === selectedOption) {
-                console.log(option.id)
-                option.classList.toggle("selected-option");
-            } else {
-                option.classList.remove("selected-option");
-            }
+            options.forEach(option => {
+                option.addEventListener("click", () => {
+                    if (option.classList.contains("selected-option")) {
+                        options.forEach(opt => opt.classList.remove("selected-option"));
+                        selectedOptions = [];
+                    } else {
+                        options.forEach(opt => opt.classList.remove("selected-option"));
+                        option.classList.toggle("selected-option");
+                    }
+                });
+            }); 
         });
     }
+
+    function getSelectedOptions() {
+        const questions = document.querySelectorAll(".question-container");
+        let selectedOptions = {};
+        questions.forEach(question => {
+            const options = question.querySelectorAll(".selected-option");
+            options.forEach(option => {
+                selectedOptions[question.id] = option.innerText;
+            });
+        });
+        return selectedOptions;
+    }
+
+    function gradeQuiz() {
+        const selectedAnswers = getSelectedOptions();
+        const cammelCasedQuizIDs = makeQuizIDsCamelCase(getSelectedQuizIDs());
+        const questionQuantity = getSelectedQuestionQuantity();
+        const questionsFromBank = getQuestionsFromQuestionBank(cammelCasedQuizIDs, questionQuantity);
     
+        let score = 0;
+        let totalQuestions = 0;
+        let correctAnswers = {};
+        let incorrectAnswers = {};
+
+        cammelCasedQuizIDs.forEach(quizID => {
+            const quizQuestionsFromBank = questionsFromBank[quizID];
+            quizQuestionsFromBank.forEach((question, index) => {
+                const questionId = `${quizID}-question-${index}`; 
+                const correctAnswer = question.answer;
+                const selectedAnswer = selectedAnswers[questionId];
+
+                if (selectedAnswer !== correctAnswer) {
+                    incorrectAnswers[questionId] = selectedAnswer;
+                } else {
+                    correctAnswers[questionId] = correctAnswer;
+                }
+                if (selectedAnswer === correctAnswer) {
+                    score++;
+                }
+                totalQuestions++;
+                
+            });
+        });
+
+        return displayQuizResults(score, totalQuestions, correctAnswers, incorrectAnswers);
+    }
+
+    function prepareQuizResultsInterface() {
+        
+    }
+
+
+    function displayQuizResults(score, totalQuestions, correctAnswers, incorrectAnswers) {
+        const quizResultsContainer = getOrCreateElement("quiz-results-container", "quiz-results-container", "div", document.body);
+        const quizResults = getOrCreateElement("quiz-results", "quiz-results", "div", quizResultsContainer);
+        const scoreElement = getOrCreateElement("score", "score", "p", quizResults, `Score: ${score}/${totalQuestions}`);
+        const retakeQuizButton = getOrCreateElement("retake-quiz-button", "retake-quiz-button", "button", quizResults, "Retake Quiz");
+
+        const wholeQuestionContainer = document.getElementById("whole-question-container");
+        
+        const quizContainers = document.querySelectorAll(".question-container");
+        quizContainers.forEach(container => {
+            container.style.display = "flex";
+            container.style.flexDirection = "column"; // Ensure the containers are displayed in a column
+        });
+
+        const nextButtons = document.querySelectorAll(".next-button");
+        const previousButtons = document.querySelectorAll(".previous-button");
+        nextButtons.forEach(button => button.style.display = "none");
+        previousButtons.forEach(button => button.style.display = "none");
+
+        const questionOptions = document.querySelectorAll(".question-option");
+        questionOptions.forEach(option => option.classList.remove(".selected-option"));
+
+        retakeQuizButton.addEventListener("click", () => {
+            window.location.reload();
+        });
+
+        const homeButton = getOrCreateElement("home-button", "home-button", "button", quizResults, "Home");
+        homeButton.addEventListener("click", () => {
+            window.location.href = "index.html";
+        });
+
+        const quizSelectionButton = getOrCreateElement("quiz-selection-button", "quiz-selection-button", "button", quizResults, "Quiz Selection");
+        quizSelectionButton.addEventListener("click", () => {
+            window.location.href = "quiz-selection.html";
+        });
+
+        console.log("Correct Answers: ", correctAnswers);
+        console.log("Incorrect Answers: ", incorrectAnswers);
+    }
 
     let currentQuestionNumber = 0;
     function updateQuestionNumber() {
@@ -246,6 +341,30 @@ document.addEventListener("DOMContentLoaded", () => {
             });
         });
     }
+
+    function startStopwatch() {
+        let time = 0;
+        setInterval(() => {
+            time++;
+            const hours = Math.floor(time / 3600);
+            const minutes = Math.floor((time % 3600) / 60);
+            const seconds = time % 60;
+    
+            const formattedTime = 
+                String(hours).padStart(2, '0') + ':' + 
+                String(minutes).padStart(2, '0') + ':' + 
+                String(seconds).padStart(2, '0');
+    
+            document.getElementById("stopwatch").innerText = formattedTime;
+        }, 1000);
+    }
+
+
+
+
+
+
+
 
     function checkIfFirstOrLastQuestion() {
         const questions = document.querySelectorAll(".question-container");
@@ -294,15 +413,6 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
-    function selectOptionEventListener() {
-        document.querySelectorAll(".question-option").forEach(option => {
-            option.addEventListener("click", (clickEvent) => {
-                const selectedOption = clickEvent.target;
-                selectOption(selectedOption.id);
-            });
-        });
-    }
-
     document.getElementById("start-quiz-button").addEventListener("click", () => {
         if (startQuizCheckup()) {
             prepareQuizEnvironment();
@@ -310,12 +420,19 @@ document.addEventListener("DOMContentLoaded", () => {
             headersInQuiz();
             setupQuestionNavigation();
             updateQuestionNumber();
-            selectOptionEventListener();
+            startStopwatch();
+            selectOption();
+
+            document.getElementById("submit-quiz-button").addEventListener("click", () => {
+                gradeQuiz();
+            });
+
 
         }
+        
     });
 
-
+    
 
     showSelectedQuizzes(getSelectedQuizIDs());
     showQuestionQuantityBorderWhenSelected();
